@@ -90,7 +90,7 @@
       return `<span class="photo-chip photo-preview-chip"><img src="${esc(url)}" alt=""><span>${i+1}. ${esc(f.name)}</span></span>`;
     }).join("");
     const accept=files=>{
-      const supported=[...files].filter(f=>{const type=String(f.type||"").toLowerCase();const ext=(String(f.name||"").split(".").pop()||"").toLowerCase();return (/^image\\/(jpeg|png|webp)$/i.test(type)||(!type&&/^(jpe?g|png|webp)$/.test(ext)))&&f.size>0&&f.size<=8*1024*1024;});
+      const supported=[...files].filter(f=>{const type=String(f.type||"").toLowerCase();const ext=(String(f.name||"").split(".").pop()||"").toLowerCase();const validType=["image/jpeg","image/png","image/webp"].includes(type);const validExtension=["jpg","jpeg","png","webp"].includes(ext);return (validType||(!type&&validExtension))&&f.size>0&&f.size<=8*1024*1024;});
       const rejected=[...files].length-supported.length;photos=[...photos,...supported].slice(0,20);picker.value="";render();
       const msg=document.querySelector("#addMessage");if(msg)msg.textContent=rejected?"Some files were skipped. Choose JPG, PNG or WebP images up to 8 MB each.":(photos.length?photos.length+" photo(s) selected.":"");
     };
