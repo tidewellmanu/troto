@@ -391,3 +391,13 @@ button,.primary-btn,.contact-btn,.payment-cta{box-shadow:none!important}
   .seller-actions{grid-template-columns:1fr}
   .dashboard-top-actions{grid-template-columns:1fr}
 }
+
+
+.sell-page-nav{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px}
+.sell-page-nav .breadcrumbs{margin:0}
+.mobile-inline-ad{display:none;justify-content:center;margin:18px auto;max-width:100%;overflow:hidden}
+@media(max-width:760px){
+  .sell-page-nav{align-items:flex-start;flex-wrap:wrap}
+  .mobile-inline-ad{display:flex}
+  .mobile-inline-ad .adsterra-slot{width:300px;max-width:100%;height:250px;flex:0 1 300px}
+}
