@@ -145,6 +145,7 @@
     if(!state.user){location.href="login.html?next=account.html";return;}
     const c=client();
     if(!c){box.innerHTML='<div class="notice">Account service unavailable.</div>';return;}
+    box.innerHTML='<div class="panel" style="padding:20px">Loading your dashboard…</div>';
     const r=await c.from("listings").select("*").eq("user_id",state.user.id).order("created_at",{ascending:false});
     if(r.error){box.innerHTML=`<div class="notice">Could not load your listings: ${esc(r.error.message)}</div>`;return;}
     const listings=r.data||[];
@@ -171,9 +172,44 @@
       return {...x,images,image:images[0]||"assets/images/logo.png"};
     });
     const featured=listings.filter(isFeatured).length;
-    const mr=await c.from("messages").select("id,listing_id,sender_name,body,created_at").in("listing_id",ids.length?ids:["00000000-0000-0000-0000-000000000000"]).order("created_at",{ascending:false});
+    const mr=ids.length?await c.from("messages").select("id,listing_id,sender_name,body,created_at").in("listing_id",ids).order("created_at",{ascending:false}):{data:[],error:null};
     const messages=mr.data||[];
-    box.innerHTML=`<section class="seller-dashboard"><div class="dashboard-head"><div><p class="eyebrow">Seller dashboard</p><h1>Welcome, ${esc(String(state.user.user_metadata?.full_name||state.user.user_metadata?.name||"").trim()||authName(state.user.email))}</h1><p class="muted">${esc(state.user.email)}</p></div><a class="add-btn" href="add-listing.html">＋ Sell</a></div><div class="dashboard-stats"><div><span>Listings</span><strong>${listings.length}</strong></div><div><span>Featured</span><strong>${featured}</strong></div><div><span>Messages</span><strong>${messages.length}</strong></div></div><div class="dashboard-card"><div class="section-head"><h2>My listings</h2><a href="add-listing.html">＋ Add listing</a></div><div class="seller-listings">${sellerListings.length?sellerListings.map(x=>`<article class="seller-listing"><div class="seller-listing-image"><img src="${esc(x.image)}" alt="${esc(x.title)}" loading="lazy" onerror="this.onerror=null;this.src='assets/images/logo.png';"></div><div class="seller-listing-info"><strong>${esc(x.title)}</strong><span>GH₵ ${esc(x.price)} · ${esc(x.location)}</span><small>${esc(x.status)}</small>${x.images.length>1?`<div class="seller-photo-strip">${x.images.slice(0,5).map((u,i)=>`<img src="${esc(u)}" alt="Photo ${i+1}" loading="lazy" onerror="this.style.display='none'">`).join("")}</div>`:""}</div><div class="seller-actions"><a class="action" href="listing.html?id=${encodeURIComponent(x.id)}">View</a><a class="action" href="advertise.html?listing_id=${encodeURIComponent(x.id)}">Promote</a><button class="action danger" data-delete-listing="${esc(x.id)}">Delete</button></div></article>`).join(""):'<div class="empty">You have not published a listing yet.</div>'}</div></div><div class="dashboard-card"><h2>Account</h2><button class="action" id="signOutBtn">Sign out</button></div></section>`;
+    box.innerHTML=`<section class="seller-dashboard">
+      <div class="dashboard-head"><div><p class="eyebrow">Seller dashboard</p><h1>Welcome, ${esc(String(state.user.user_metadata?.full_name||state.user.user_metadata?.name||"").trim()||authName(state.user.email))}</h1><p class="muted">${esc(state.user.email)}</p></div><div class="dashboard-top-actions"><a class="action" href="index.html">← Marketplace</a><a class="add-btn" href="add-listing.html">＋ Sell</a></div></div>
+      <div class="dashboard-stats"><div><span>Listings</span><strong>${listings.length}</strong></div><div><span>Featured</span><strong>${featured}</strong></div><div><span>Messages</span><strong>${messages.length}</strong></div></div>
+      <div class="dashboard-ad-row"><div class="adsterra-slot ad-300x250"><span>Adsterra 300 × 250 placement</span></div></div>
+      <div class="dashboard-card"><div class="section-head"><h2>My listings</h2><a href="add-listing.html">＋ Add listing</a></div>
+        <div class="seller-listings">${sellerListings.length?sellerListings.map(x=>`<article class="seller-listing">
+          <div class="seller-listing-gallery">
+            <div class="seller-listing-image"><img data-dashboard-photo="${esc(x.id)}" data-photo-index="0" src="${esc(x.image)}" alt="${esc(x.title)}" loading="lazy" onerror="this.onerror=null;this.src='assets/images/logo.png';"></div>
+            ${x.images.length>1?`<div class="seller-gallery-controls"><button type="button" data-dashboard-step="-1" data-listing-id="${esc(x.id)}" aria-label="Previous photo">‹</button><span data-dashboard-count="${esc(x.id)}">1 / ${x.images.length}</span><button type="button" data-dashboard-step="1" data-listing-id="${esc(x.id)}" aria-label="Next photo">›</button></div>`:""}
+          </div>
+          <div class="seller-listing-info"><strong>${esc(x.title)}</strong><span>GH₵ ${esc(x.price)} · ${esc(x.location)}</span><small class="listing-status">${esc(x.status)}</small>${x.images.length>1?`<div class="seller-photo-strip">${x.images.slice(0,5).map((u,i)=>`<button type="button" class="seller-thumb ${i===0?"active":""}" data-dashboard-thumb="${esc(x.id)}" data-photo-index="${i}" aria-label="Show photo ${i+1}"><img src="${esc(u)}" alt="Photo ${i+1}" loading="lazy" onerror="this.parentElement.style.display='none'"></button>`).join("")}</div>`:""}</div>
+          <div class="seller-actions"><a class="action" href="listing.html?id=${encodeURIComponent(x.id)}">View ad</a><a class="action" href="advertise.html?listing_id=${encodeURIComponent(x.id)}">Promote</a><button class="action danger" data-delete-listing="${esc(x.id)}">Delete</button></div>
+        </article>`).join(""):'<div class="empty">You have not published a listing yet. <a href="add-listing.html">Post your first ad</a>.</div>'}</div>
+      </div>
+      <div class="dashboard-ad-row"><div class="adsterra-slot ad-300x250"><span>Adsterra 300 × 250 placement</span></div></div>
+      <div class="dashboard-card account-tools"><h2>Account</h2><div class="account-tools-actions"><a class="action" href="index.html">Return to marketplace</a><button class="action" id="signOutBtn">Sign out</button></div></div>
+    </section>`;
+    const changePhoto=(id,index)=>{
+      const item=sellerListings.find(x=>String(x.id)===String(id));
+      if(!item||!item.images.length)return;
+      const img=$(`[data-dashboard-photo="${CSS.escape(String(id))}"]`);
+      const count=$(`[data-dashboard-count="${CSS.escape(String(id))}"]`);
+      const n=(index+item.images.length)%item.images.length;
+      if(img){img.dataset.photoIndex=String(n);img.src=item.images[n];}
+      if(count)count.textContent=`${n+1} / ${item.images.length}`;
+      $$('[data-dashboard-thumb]').filter(b=>b.dataset.listingId===String(id)).forEach(b=>b.classList.toggle("active",Number(b.dataset.photoIndex)===n));
+      $$('[data-dashboard-thumb]').filter(b=>b.dataset.dashboardThumb===String(id)).forEach(b=>b.classList.toggle("active",Number(b.dataset.photoIndex)===n));
+    };
+    $$('[data-dashboard-step]').forEach(b=>b.onclick=()=>{
+      const id=b.dataset.listingId,item=sellerListings.find(x=>String(x.id)===String(id));
+      if(!item||item.images.length<2)return;
+      const img=$(`[data-dashboard-photo="${CSS.escape(String(id))}"]`);
+      const current=Number(img?.dataset.photoIndex||0);
+      changePhoto(id,current+Number(b.dataset.dashboardStep));
+    });
+    $$('[data-dashboard-thumb]').forEach(b=>b.onclick=()=>changePhoto(b.dataset.dashboardThumb,Number(b.dataset.photoIndex)));
     $$('[data-delete-listing]').forEach(b=>b.onclick=async()=>{
       if(!confirm("Delete this listing?"))return;
       const id=b.dataset.deleteListing;
