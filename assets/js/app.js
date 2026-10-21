@@ -118,10 +118,11 @@
         // the homepage, listings page, detail page and seller dashboard.
         const up=await c.from("listings").update({images:urls}).eq("id",listingId).eq("user_id",state.user.id).select("id,status,images").single();
         if(up.error) console.warn("Listing image-array update failed; listing remains published and image rows will be used.",up.error);
-        const verify=await c.from("listings").select("id,status").eq("id",listingId).eq("user_id",state.user.id).maybeSingle();
-        if(verify.error||!verify.data) throw new Error("The listing could not be verified after publishing. Please try again.");
-        msg.textContent="Listing published successfully. It is now visible in listings.";
-        setTimeout(()=>location.href="account.html",500);
+        const verify=await c.from("listings").select("id,status").eq("id",listingId).eq("user_id",state.user.id).eq("status","active").maybeSingle();
+        if(verify.error||!verify.data) throw new Error("The ad was saved but could not be confirmed as publicly active. Check the listings table and its status/RLS policies.");
+        await loadListings();
+        msg.textContent="Listing published successfully. Opening your live ad…";
+        setTimeout(()=>location.href="listing.html?id="+encodeURIComponent(listingId),800);
       }catch(err){
         // Only roll back when the listing itself or the required photo upload failed.
         // Do not delete a successfully-created listing because an optional image metadata
@@ -205,8 +206,32 @@
     if("serviceWorker" in navigator)window.addEventListener("load",()=>navigator.serviceWorker.register("/service-worker.js").catch(e=>console.warn("PWA service worker:",e)));
     installPwa();
   }
-  let bootStarted=false;
-  async function boot(){const c=client();if(!c||bootStarted)return;bootStarted=true;if(c){const {data:{session}}=await c.auth.getSession();state.user=session?.user||null;renderAll();c.auth.onAuthStateChange((_e,s)=>{state.user=s?.user||null;renderHeaderFooter();if($("#accountContent"))account();});await loadListings();bootStarted=false;}else{state.data.listings=[];renderAll();bootStarted=false;}}
+  let bootStarted=false, refreshHooksInstalled=false, listingChannel=null;
+  function installListingRefresh(c){
+    if(refreshHooksInstalled)return;
+    refreshHooksInstalled=true;
+    // Refresh pages left open on another device/tab; the timer is a fallback if Realtime is not enabled.
+    window.addEventListener("focus",()=>{if(document.visibilityState==="visible")loadListings();});
+    document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible")loadListings();});
+    window.setInterval(()=>{if(document.visibilityState==="visible")loadListings();},30000);
+    try{
+      listingChannel=c.channel("public-listings-live")
+        .on("postgres_changes",{event:"*",schema:"public",table:"listings"},()=>loadListings())
+        .subscribe(status=>{if(status==="CHANNEL_ERROR"||status==="TIMED_OUT")console.warn("Listings Realtime unavailable; periodic refresh remains enabled.");});
+    }catch(error){console.warn("Listings Realtime could not start; periodic refresh remains enabled.",error);}
+  }
+  async function boot(){
+    const c=client();if(!c||bootStarted)return;bootStarted=true;
+    try{
+      const {data:{session},error}=await c.auth.getSession();
+      if(error)console.warn("Could not restore Supabase session:",error);
+      state.user=session?.user||null;renderAll();
+      c.auth.onAuthStateChange((_e,s)=>{state.user=s?.user||null;renderHeaderFooter();if($("#accountContent"))account();});
+      installListingRefresh(c);
+      await loadListings();
+    }catch(error){console.error("TrotroMall startup failed:",error);state.listingsError=error.message||"Marketplace connection failed.";renderAll();}
+    finally{bootStarted=false;}
+  }
   document.addEventListener("DOMContentLoaded",()=>{registerPwa();boot();});
   document.addEventListener("trotro:supabase-ready",()=>boot());
 })();
