@@ -25,11 +25,16 @@
         const r=await c.from("listing_images").select("listing_id,storage_path,position").in("listing_id",ids).order("position",{ascending:true});
         if(!r.error) imageRows=r.data||[];
       }
-      const storageUrl=p=>{
+      const storageUrl=value=>{
+        if(!value)return "";
+        let p=value;
+        if(typeof p==="object")p=p.url||p.src||p.publicUrl||p.public_url||p.storage_path||p.path||p.image_url||"";
         if(!p)return "";
-        if(/^https?:\/\//i.test(String(p)))return String(p);
-        const result=c.storage.from("listing-photos").getPublicUrl(String(p));
-        return result?.data?.publicUrl||"";
+        p=String(p).trim();
+        if(!p)return "";
+        if(/^(https?:|data:|blob:)/i.test(p)||p.startsWith("/")||p.startsWith("assets/"))return p;
+        p=p.replace(/^public\\//i,"").replace(/^listing-photos\\//i,"");
+        try{return c.storage.from("listing-photos").getPublicUrl(p)?.data?.publicUrl||""}catch(_){return ""}
       };
       const grouped={};
       imageRows.forEach(i=>{
@@ -40,12 +45,11 @@
         const rowImages=(grouped[x.id]||[]).sort((a,b)=>a.position-b.position).map(i=>i.url);
         let rawLegacy=x.images;
         if(typeof rawLegacy==="string"){
-          try{rawLegacy=JSON.parse(rawLegacy)}catch(_){rawLegacy=rawLegacy.split(/[\\n,]/).map(s=>s.trim()).filter(Boolean)}
+          try{rawLegacy=JSON.parse(rawLegacy)}catch(_){rawLegacy=rawLegacy.split(/[\n,]/).map(s=>s.trim()).filter(Boolean)}
         }
         if(!Array.isArray(rawLegacy))rawLegacy=rawLegacy?[rawLegacy]:[];
         const legacy=rawLegacy.map(storageUrl).filter(Boolean);
         const images=[...new Set([...rowImages,...legacy])];
-        const images=[...new Set([...rowImages,...legacy,...direct])];
         return normalize({...x,images},images);
       });
       renderAll();
