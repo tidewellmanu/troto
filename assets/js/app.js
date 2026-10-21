@@ -152,7 +152,7 @@
         }).select("id").single();
         if(error)throw new Error("Could not create listing: "+error.message);
         listingId=row.id;
-        const urls=[];
+        const urls=[];let imageRowsSaved=0;
         for(let i=0;i<photos.length;i++){
           const f=photos[i],ext=(f.name.split(".").pop()||"jpg").toLowerCase();
           const mime={"jpg":"image/jpeg","jpeg":"image/jpeg","png":"image/png","webp":"image/webp"}[ext]||f.type;
@@ -164,11 +164,11 @@
           if(!publicUrl)throw new Error(`Photo ${i+1} uploaded but its public URL could not be created.`);
           urls.push(publicUrl);
           const inserted=await c.from("listing_images").insert({listing_id:listingId,user_id:state.user.id,storage_path:path,position:i});
-          if(inserted.error)console.warn("Listing image metadata insert failed; image URLs will remain on listing:",inserted.error.message);
+          if(inserted.error)console.warn("Listing image metadata insert failed; image URLs will remain on listing:",inserted.error.message);else imageRowsSaved++;
           if(msg)msg.textContent=`Uploading photo ${i+1} of ${photos.length}…`;
         }
         const update=await c.from("listings").update({images:urls}).eq("id",listingId).eq("user_id",state.user.id);
-        if(update.error)throw new Error("Photos uploaded, but listing image links could not be saved: "+update.error.message);
+        if(update.error){console.warn("Listing image-array update failed:",update.error.message);if(!imageRowsSaved)throw new Error("Photos uploaded, but image links could not be saved. "+update.error.message);}
         const verify=await c.from("listings").select("id,status,images").eq("id",listingId).eq("user_id",state.user.id).eq("status","active").maybeSingle();
         if(verify.error||!verify.data)throw new Error("Listing was created but could not be verified as active. "+(verify.error?.message||"Check your listings access policies."));
         await loadListings();
