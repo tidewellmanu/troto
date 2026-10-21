@@ -90,8 +90,9 @@
       return `<span class="photo-chip photo-preview-chip"><img src="${esc(url)}" alt=""><span>${i+1}. ${esc(f.name)}</span></span>`;
     }).join("");
     const accept=files=>{
-      photos=[...photos,...[...files].filter(f=>/^image\/(jpeg|png|webp)$/i.test(f.type)).filter(f=>f.size<=8*1024*1024)].slice(0,20);
-      picker.value=""; render();
+      const supported=[...files].filter(f=>{const type=String(f.type||"").toLowerCase();const ext=(String(f.name||"").split(".").pop()||"").toLowerCase();return (/^image\\/(jpeg|png|webp)$/i.test(type)||(!type&&/^(jpe?g|png|webp)$/.test(ext)))&&f.size>0&&f.size<=8*1024*1024;});
+      const rejected=[...files].length-supported.length;photos=[...photos,...supported].slice(0,20);picker.value="";render();
+      const msg=document.querySelector("#addMessage");if(msg)msg.textContent=rejected?"Some files were skipped. Choose JPG, PNG or WebP images up to 8 MB each.":(photos.length?photos.length+" photo(s) selected.":"");
     };
     picker?.addEventListener("change",()=>accept(picker.files));
     drop?.addEventListener("click",e=>{if(e.target!==picker)picker?.click()});
@@ -118,7 +119,8 @@
         for(let i=0;i<photos.length;i++){
           const f=photos[i],ext=(f.name.split(".").pop()||"jpg").toLowerCase();
           const path=`${state.user.id}/${listingId}/${crypto.randomUUID()}.${ext}`;
-          const up=await c.storage.from("listing-photos").upload(path,f,{contentType:f.type,upsert:false});
+          const mime=f.type||({jpg:"image/jpeg",jpeg:"image/jpeg",png:"image/png",webp:"image/webp"}[ext]||"application/octet-stream");
+          const up=await c.storage.from("listing-photos").upload(path,f,{contentType:mime,upsert:false});
           if(up.error)throw up.error;
           uploadedPaths.push(path);
           const publicUrl=c.storage.from("listing-photos").getPublicUrl(path)?.data?.publicUrl||"";
