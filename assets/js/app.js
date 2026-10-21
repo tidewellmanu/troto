@@ -33,7 +33,7 @@
         p=String(p).trim();
         if(!p)return "";
         if(/^(https?:|data:|blob:)/i.test(p)||p.startsWith("/")||p.startsWith("assets/"))return p;
-        p=p.replace(/^public\\//i,"").replace(/^listing-photos\\//i,"");
+        if(p.startsWith("public/"))p=p.slice(7);if(p.startsWith("listing-photos/"))p=p.slice(14);
         try{return c.storage.from("listing-photos").getPublicUrl(p)?.data?.publicUrl||""}catch(_){return ""}
       };
       const grouped={};
@@ -45,7 +45,7 @@
         const rowImages=(grouped[x.id]||[]).sort((a,b)=>a.position-b.position).map(i=>i.url);
         let rawLegacy=x.images;
         if(typeof rawLegacy==="string"){
-          try{rawLegacy=JSON.parse(rawLegacy)}catch(_){rawLegacy=rawLegacy.split(/[\n,]/).map(s=>s.trim()).filter(Boolean)}
+          try{rawLegacy=JSON.parse(rawLegacy)}catch(_){rawLegacy=rawLegacy.split(/[,\r\n]/).map(s=>s.trim()).filter(Boolean)}
         }
         if(!Array.isArray(rawLegacy))rawLegacy=rawLegacy?[rawLegacy]:[];
         const legacy=rawLegacy.map(storageUrl).filter(Boolean);
@@ -174,7 +174,7 @@
       p=String(p).trim();
       if(!p)return "";
       if(/^(https?:|data:|blob:)/i.test(p)||p.startsWith("/")||p.startsWith("assets/"))return p;
-      p=p.replace(/^public\//i,"").replace(/^listing-photos\//i,"");
+        if(p.startsWith("public/"))p=p.slice(7);if(p.startsWith("listing-photos/"))p=p.slice(14);
       try{
         const result=c.storage.from("listing-photos").getPublicUrl(p);
         return result?.data?.publicUrl||"";
