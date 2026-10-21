@@ -38,8 +38,13 @@
       });
       state.data.listings=rows.map(x=>{
         const rowImages=(grouped[x.id]||[]).sort((a,b)=>a.position-b.position).map(i=>i.url);
-        const legacy=Array.isArray(x.images)?x.images.map(storageUrl).filter(Boolean):[];
-        const direct=Array.isArray(x.image_urls)?x.image_urls.map(storageUrl).filter(Boolean):[];
+        let rawLegacy=x.images;
+        if(typeof rawLegacy==="string"){
+          try{rawLegacy=JSON.parse(rawLegacy)}catch(_){rawLegacy=rawLegacy.split(/[\\n,]/).map(s=>s.trim()).filter(Boolean)}
+        }
+        if(!Array.isArray(rawLegacy))rawLegacy=rawLegacy?[rawLegacy]:[];
+        const legacy=rawLegacy.map(storageUrl).filter(Boolean);
+        const images=[...new Set([...rowImages,...legacy])];
         const images=[...new Set([...rowImages,...legacy,...direct])];
         return normalize({...x,images},images);
       });
@@ -198,7 +203,6 @@
           <div class="seller-actions"><a class="action" href="listing.html?id=${encodeURIComponent(x.id)}">View ad</a><a class="action" href="advertise.html?listing_id=${encodeURIComponent(x.id)}">Promote</a><button class="action danger" data-delete-listing="${esc(x.id)}">Delete</button></div>
         </article>`).join(""):'<div class="empty">You have not published a listing yet. <a href="add-listing.html">Post your first ad</a>.</div>'}</div>
       </div>
-      <div class="dashboard-ad-row"><div class="adsterra-slot ad-300x250"><span>Adsterra 300 × 250 placement</span></div></div>
       <div class="dashboard-card account-tools"><h2>Account</h2><div class="account-tools-actions"><a class="action" href="index.html">Return to marketplace</a><button class="action" id="signOutBtn">Sign out</button></div></div>
     </section>`;
     const changePhoto=(id,index)=>{
