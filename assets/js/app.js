@@ -148,20 +148,25 @@
       }finally{submit.disabled=false}
     });
   }
+  let accountRenderId=0;
   async function account(){
+    const renderId=++accountRenderId;
     const box=$("#accountContent");
     if(!box)return;
     if(!state.user){location.href="login.html?next=account.html";return;}
     const c=client();
     if(!c){box.innerHTML='<div class="notice">Account service unavailable.</div>';return;}
     box.innerHTML='<div class="panel" style="padding:20px">Loading your dashboard…</div>';
-    const r=await c.from("listings").select("*").eq("user_id",state.user.id).order("created_at",{ascending:false});
+    const ownerId=state.user.id;
+    const r=await c.from("listings").select("*").eq("user_id",ownerId).order("created_at",{ascending:false});
+    if(renderId!==accountRenderId)return;
     if(r.error){box.innerHTML=`<div class="notice">Could not load your listings: ${esc(r.error.message)}</div>`;return;}
     const listings=r.data||[];
     const ids=listings.map(x=>x.id);
     let imageRows=[];
     if(ids.length){
       const ir=await c.from("listing_images").select("listing_id,storage_path,position").in("listing_id",ids).order("position",{ascending:true});
+      if(renderId!==accountRenderId)return;
       if(!ir.error) imageRows=ir.data||[];
     }
     const storageUrl=value=>{
@@ -193,6 +198,7 @@
     });
     const featured=listings.filter(isFeatured).length;
     const mr=ids.length?await c.from("messages").select("id,listing_id,sender_name,body,created_at").in("listing_id",ids).order("created_at",{ascending:false}):{data:[],error:null};
+    if(renderId!==accountRenderId)return;
     const messages=mr.data||[];
     box.innerHTML=`<section class="seller-dashboard">
       <div class="dashboard-head"><div><p class="eyebrow">Seller dashboard</p><h1>Welcome, ${esc(String(state.user.user_metadata?.full_name||state.user.user_metadata?.name||"").trim()||authName(state.user.email))}</h1><p class="muted">${esc(state.user.email)}</p></div><div class="dashboard-top-actions"><a class="action" href="index.html">← Marketplace</a><a class="add-btn" href="add-listing.html">＋ Sell</a></div></div>
