@@ -508,3 +508,83 @@ button,.primary-btn,.contact-btn,.payment-cta{box-shadow:none!important}
   .dashboard-stats > div:last-child { grid-column: auto; }
   .mobile-bottom-nav a { font-size: 11px; }
 }
+
+
+/* Final mobile layout pass: remove empty ad wrappers and refine dashboard/navigation */
+@media (max-width: 720px) {
+  .mobile-bottom-nav {
+    display: grid !important;
+    position: fixed !important;
+    inset: auto 0 0;
+    width: 100%;
+    height: calc(66px + env(safe-area-inset-bottom, 0px));
+    padding: 5px 8px env(safe-area-inset-bottom, 0px);
+    background: rgba(255,255,255,.98);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border-top: 1px solid #e4e8ef;
+    box-shadow: 0 -5px 20px rgba(27,39,56,.09);
+  }
+  .mobile-bottom-nav a {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    font-weight: 700;
+    color: #536176;
+    text-decoration: none;
+    touch-action: manipulation;
+  }
+  .mobile-bottom-nav a.mobile-sell {
+    color: #fff;
+    background: #e63333;
+    box-shadow: 0 3px 8px rgba(230,51,51,.18);
+  }
+  .mobile-bottom-nav a:focus-visible,
+  .top-actions .add-btn:focus-visible {
+    outline: 3px solid rgba(77,111,174,.45);
+    outline-offset: 2px;
+  }
+
+  /* Hide both ad creatives and their wrappers so no blank ad gap remains. */
+  .mobile-inline-ad,
+  .dashboard-ad-row,
+  .ad-box,
+  .ad-rail,
+  .page-ad-rail,
+  .ad-slot,
+  .ad-container,
+  .advertisement-slot,
+  [data-ad-slot],
+  [class*="adsterra-slot"],
+  [id*="adsterra"] {
+    display: none !important;
+    width: 0 !important;
+    height: 0 !important;
+    min-height: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: 0 !important;
+    overflow: hidden !important;
+  }
+
+  .seller-dashboard { min-width: 0; }
+  .dashboard-head { gap: 12px; }
+  .dashboard-head h1 { overflow-wrap: anywhere; }
+  .dashboard-stats > div { min-width: 0; }
+  .dashboard-stats strong { display: block; }
+  .dashboard-card { min-width: 0; }
+  .seller-listing { min-width: 0; }
+  .seller-listing-gallery,
+  .seller-listing-info { min-width: 0; }
+  .seller-listing-image { overflow: hidden; }
+  .seller-listing-info { overflow-wrap: anywhere; }
+  .seller-actions .action { line-height: 1.25; }
+  .card-img img { pointer-events: none; }
+}
+@media (max-width: 380px) {
+  .mobile-bottom-nav { padding-left: 4px; padding-right: 4px; }
+  .mobile-bottom-nav a { font-size: 10px; }
+  .dashboard-stats { grid-template-columns: repeat(2,minmax(0,1fr)) !important; }
+  .dashboard-top-actions { grid-template-columns: repeat(2,minmax(0,1fr)); }
+}
