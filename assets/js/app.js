@@ -84,75 +84,105 @@
   function requireAuth(){if(state.user)return true;location.href="login.html?next="+encodeURIComponent("add-listing.html");return false;}
   function addListing(){
     const form=$("#addForm"); if(!form)return;
-    const picker=$("#photos"),drop=$("#photoDrop"),preview=$("#photoPreview"); let photos=[];
-    const render=()=>preview.innerHTML=photos.map((f,i)=>{
-      const url=URL.createObjectURL(f);
-      return `<span class="photo-chip photo-preview-chip"><img src="${esc(url)}" alt=""><span>${i+1}. ${esc(f.name)}</span></span>`;
-    }).join("");
-    const accept=files=>{
-      const supported=[...files].filter(f=>{const type=String(f.type||"").toLowerCase();const ext=(String(f.name||"").split(".").pop()||"").toLowerCase();const validType=["image/jpeg","image/png","image/webp"].includes(type);const validExtension=["jpg","jpeg","png","webp"].includes(ext);return (validType||(!type&&validExtension))&&f.size>0&&f.size<=8*1024*1024;});
-      const rejected=[...files].length-supported.length;photos=[...photos,...supported].slice(0,20);picker.value="";render();
-      const msg=document.querySelector("#addMessage");if(msg)msg.textContent=rejected?"Some files were skipped. Choose JPG, PNG or WebP images up to 8 MB each.":(photos.length?photos.length+" photo(s) selected.":"");
+    const picker=$("#photos"),drop=$("#photoDrop"),preview=$("#photoPreview"),msg=$("#addMessage");
+    let photos=[];
+    const urls=new Map();
+    const revokePreview=f=>{const url=urls.get(f);if(url){URL.revokeObjectURL(url);urls.delete(f);}};
+    const render=()=>{
+      preview.innerHTML=photos.map((f,i)=>{
+        if(!urls.has(f))urls.set(f,URL.createObjectURL(f));
+        return `<div class="photo-chip photo-preview-chip"><img src="${esc(urls.get(f))}" alt="Preview of ${esc(f.name)}"><span class="photo-preview-name">${i+1}. ${esc(f.name)}</span><button type="button" class="photo-remove" data-remove-photo="${i}" aria-label="Remove ${esc(f.name)}">×</button></div>`;
+      }).join("");
+      preview.classList.toggle("has-photos",photos.length>0);
     };
-    picker?.addEventListener("change",()=>accept(picker.files));
-    drop?.addEventListener("click",e=>{if(e.target!==picker)picker?.click()});
-    drop?.addEventListener("keydown",e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();picker?.click()}});
-    drop?.setAttribute("role","button"); drop?.setAttribute("tabindex","0");
-    drop?.addEventListener("dragover",e=>{e.preventDefault();drop.classList.add("dragover")});
-    drop?.addEventListener("dragleave",()=>drop.classList.remove("dragover"));
-    drop?.addEventListener("drop",e=>{e.preventDefault();drop.classList.remove("dragover");accept(e.dataTransfer.files)});
+    const accept=files=>{
+      const incoming=Array.from(files||[]);
+      if(!incoming.length)return;
+      const supported=[],rejected=[];
+      incoming.forEach(f=>{
+        const type=String(f.type||"").toLowerCase();
+        const ext=(String(f.name||"").split(".").pop()||"").toLowerCase();
+        const types={"jpg":"image/jpeg","jpeg":"image/jpeg","png":"image/png","webp":"image/webp"};
+        const extensionType=types[ext];
+        const valid=(["image/jpeg","image/png","image/webp"].includes(type)&&(!extensionType||type===extensionType))||(!type&&Boolean(extensionType));
+        if(!valid||!f.size||f.size>8*1024*1024){rejected.push(f);return;}
+        if(photos.length+supported.length>=20){rejected.push(f);return;}
+        supported.push(f);
+      });
+      photos=[...photos,...supported];
+      render();
+      if(msg){
+        const note=rejected.length ? ` ${rejected.length} file(s) skipped: use JPG, PNG or WebP, each under 8 MB (maximum 20 photos).` : "";
+        msg.textContent=`${photos.length} photo(s) ready to upload.${note}`;
+        msg.style.color=rejected.length?"#b42318":"#2c9a62";
+      }
+    };
+    picker?.addEventListener("change",()=>{accept(picker.files);picker.value="";});
+    preview?.addEventListener("click",e=>{
+      const button=e.target.closest("[data-remove-photo]");
+      if(!button)return;
+      const index=Number(button.dataset.removePhoto),file=photos[index];
+      if(file)revokePreview(file);
+      photos=photos.filter((_,i)=>i!==index);
+      render();
+      if(msg)msg.textContent=photos.length?`${photos.length} photo(s) ready to upload.`:"Select or drop at least one photo to continue.";
+    });
+    drop?.setAttribute("role","button");drop?.setAttribute("tabindex","0");
+    drop?.addEventListener("click",e=>{if(e.target!==picker&&!e.target.closest("button"))picker?.click();});
+    drop?.addEventListener("keydown",e=>{if((e.key==="Enter"||e.key===" ")&&e.target===drop){e.preventDefault();picker?.click();}});
+    drop?.addEventListener("dragenter",e=>{e.preventDefault();drop.classList.add("dragover");});
+    drop?.addEventListener("dragover",e=>{e.preventDefault();if(e.dataTransfer)e.dataTransfer.dropEffect="copy";drop.classList.add("dragover");});
+    drop?.addEventListener("dragleave",e=>{if(!drop.contains(e.relatedTarget))drop.classList.remove("dragover");});
+    drop?.addEventListener("drop",e=>{e.preventDefault();e.stopPropagation();drop.classList.remove("dragover");accept(e.dataTransfer?.files);});
+    window.addEventListener("beforeunload",()=>urls.forEach(url=>URL.revokeObjectURL(url)),{once:true});
     form.addEventListener("submit",async e=>{
-      e.preventDefault(); const msg=$("#addMessage");
+      e.preventDefault();
       if(!requireAuth())return;
-      if(!photos.length){msg.textContent="Please upload at least one photo.";return;}
-      const c=client(); if(!c){msg.textContent="Marketplace connection is unavailable.";return;}
-      const fd=new FormData(form),submit=form.querySelector("button[type=submit]")||form.querySelector("button");
-      submit.disabled=true; msg.textContent="Publishing…"; let listingId=null,uploadedPaths=[];
+      if(!photos.length){if(msg)msg.textContent="Please select or drag at least one photo.";return;}
+      const c=client();if(!c){if(msg)msg.textContent="Marketplace connection is unavailable. Refresh and try again.";return;}
+      const fd=new FormData(form),submit=form.querySelector('button[type="submit"]')||form.querySelector("button");
+      if(submit)submit.disabled=true;
+      if(msg){msg.style.color="#2c9a62";msg.textContent="Uploading photos and publishing your listing…";}
+      let listingId=null,uploadedPaths=[];
       try{
         const {data:row,error}=await c.from("listings").insert({
-          user_id:state.user.id,title:String(fd.get("title")).trim(),description:String(fd.get("description")||"").trim(),
-          price:Number(String(fd.get("price")).replace(/,/g,"")),category:fd.get("category"),location:fd.get("location"),
+          user_id:state.user.id,title:String(fd.get("title")||"").trim(),description:String(fd.get("description")||"").trim(),
+          price:Number(String(fd.get("price")||"").replace(/,/g,"")),category:fd.get("category"),location:fd.get("location"),
           condition:fd.get("condition")||"Used",seller_phone:String(fd.get("seller_phone")||"").trim()||null,status:"active",images:[]
         }).select("id").single();
-        if(error)throw error; listingId=row.id;
+        if(error)throw new Error("Could not create listing: "+error.message);
+        listingId=row.id;
         const urls=[];
         for(let i=0;i<photos.length;i++){
           const f=photos[i],ext=(f.name.split(".").pop()||"jpg").toLowerCase();
+          const mime={"jpg":"image/jpeg","jpeg":"image/jpeg","png":"image/png","webp":"image/webp"}[ext]||f.type;
           const path=`${state.user.id}/${listingId}/${crypto.randomUUID()}.${ext}`;
-          const mime=f.type||({jpg:"image/jpeg",jpeg:"image/jpeg",png:"image/png",webp:"image/webp"}[ext]||"application/octet-stream");
-          const up=await c.storage.from("listing-photos").upload(path,f,{contentType:mime,upsert:false});
-          if(up.error)throw up.error;
+          const uploaded=await c.storage.from("listing-photos").upload(path,f,{contentType:mime,upsert:false,cacheControl:"31536000"});
+          if(uploaded.error)throw new Error(`Photo ${i+1} (${f.name}) failed to upload: ${uploaded.error.message}`);
           uploadedPaths.push(path);
           const publicUrl=c.storage.from("listing-photos").getPublicUrl(path)?.data?.publicUrl||"";
-          if(publicUrl)urls.push(publicUrl);
-          const ins=await c.from("listing_images").insert({listing_id:listingId,user_id:state.user.id,storage_path:path,position:i});
-          if(ins.error)console.warn("listing_images row could not be created; listing will still retain its image URL.",ins.error);
+          if(!publicUrl)throw new Error(`Photo ${i+1} uploaded but its public URL could not be created.`);
+          urls.push(publicUrl);
+          const inserted=await c.from("listing_images").insert({listing_id:listingId,user_id:state.user.id,storage_path:path,position:i});
+          if(inserted.error)console.warn("Listing image metadata insert failed; image URLs will remain on listing:",inserted.error.message);
+          if(msg)msg.textContent=`Uploading photo ${i+1} of ${photos.length}…`;
         }
-        if(!urls.length)throw new Error("Photos could not be published. Check that the listing-photos storage bucket is public and its upload policy allows signed-in sellers.");
-        // Keep the listing active even if the auxiliary image-array update is rejected by RLS.
-        // The listing_images rows + public storage URLs are the canonical image fallback used by
-        // the homepage, listings page, detail page and seller dashboard.
-        const up=await c.from("listings").update({images:urls}).eq("id",listingId).eq("user_id",state.user.id).select("id,status,images").single();
-        if(up.error) console.warn("Listing image-array update failed; listing remains published and image rows will be used.",up.error);
-        const verify=await c.from("listings").select("id,status").eq("id",listingId).eq("user_id",state.user.id).eq("status","active").maybeSingle();
-        if(verify.error||!verify.data) throw new Error("The ad was saved but could not be confirmed as publicly active. Check the listings table and its status/RLS policies.");
+        const update=await c.from("listings").update({images:urls}).eq("id",listingId).eq("user_id",state.user.id);
+        if(update.error)throw new Error("Photos uploaded, but listing image links could not be saved: "+update.error.message);
+        const verify=await c.from("listings").select("id,status,images").eq("id",listingId).eq("user_id",state.user.id).eq("status","active").maybeSingle();
+        if(verify.error||!verify.data)throw new Error("Listing was created but could not be verified as active. "+(verify.error?.message||"Check your listings access policies."));
         await loadListings();
-        msg.textContent="Listing published successfully. Opening your live ad…";
+        if(msg)msg.textContent="Listing and photos published successfully. Opening your ad…";
         setTimeout(()=>location.href="listing.html?id="+encodeURIComponent(listingId),800);
       }catch(err){
-        // Only roll back when the listing itself or the required photo upload failed.
-        // Do not delete a successfully-created listing because an optional image metadata
-        // write failed: that was the cause of previously disappearing published ads.
-        if(listingId && !uploadedPaths.length){
-          await c.from("listings").delete().eq("id",listingId).eq("user_id",state.user.id);
+        console.error("TrotroMall listing/photo upload failed:",err);
+        if(listingId){
+          try{await c.from("listing_images").delete().eq("listing_id",listingId).eq("user_id",state.user.id);}catch(_){}
+          try{await c.from("listings").delete().eq("id",listingId).eq("user_id",state.user.id);}catch(_){}
         }
-        if(uploadedPaths.length && listingId && /storage|upload|Photo/i.test(String(err.message||""))){
-          try{await c.from("listing_images").delete().eq("listing_id",listingId).eq("user_id",state.user.id)}catch(_){}
-          try{await c.from("listings").delete().eq("id",listingId).eq("user_id",state.user.id)}catch(_){}
-          try{await c.storage.from("listing-photos").remove(uploadedPaths)}catch(_){}
-        }
-        msg.textContent=err.message||"Could not publish listing."; console.error(err);
-      }finally{submit.disabled=false}
+        if(uploadedPaths.length){try{await c.storage.from("listing-photos").remove(uploadedPaths);}catch(_){}}
+        if(msg){msg.style.color="#b42318";msg.textContent=err.message||"Upload failed. Please try again.";}
+      }finally{if(submit)submit.disabled=false;}
     });
   }
   let accountRenderId=0;
