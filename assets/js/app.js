@@ -9,7 +9,12 @@
   const authName=email=>String(email||"").split("@")[0].replace(/[._-]+/g," ").split(/\s+/).filter(Boolean).map(w=>w.charAt(0).toUpperCase()+w.slice(1).toLowerCase()).join(" ")||"User";
   const isFeatured=x=>Boolean(x.is_featured && x.featured_until && new Date(x.featured_until)>new Date());
   function normalize(row,images=[]){
-    const urls=images.length?images.map(i=>i.url||i.public_url).filter(Boolean):(Array.isArray(row.images)?row.images:[]);
+    const source=images.length?images:(Array.isArray(row.images)?row.images:[]);
+    const urls=source.map(value=>{
+      if(typeof value==="string")return value.trim();
+      if(value&&typeof value==="object")return value.url||value.public_url||value.publicUrl||value.image_url||value.storage_path||value.path||value.src||"";
+      return "";
+    }).filter(Boolean);
     return {...row,image:urls[0]||"",images:urls,seller:row.seller_name||row.seller||"Seller",phone:row.seller_phone||"",condition:row.condition||"Used"};
   }
   async function loadListings(){
