@@ -646,3 +646,20 @@ button,.primary-btn,.contact-btn,.payment-cta{box-shadow:none!important}
   .seller-dashboard .dashboard-head { overflow:hidden; }
   .seller-dashboard .seller-listing { overflow:hidden; }
 }
+
+
+/* Listing photo picker: visible previews for both gallery selection and drag/drop. */
+#photoPreview { display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:10px; margin-top:12px; }
+#photoPreview:empty { display:none; }
+#photoPreview .photo-preview-chip { position:relative; display:grid; grid-template-columns:64px minmax(0,1fr) 28px; align-items:center; gap:9px; min-width:0; min-height:82px; margin:0; padding:8px; border:1px solid #dfe5ed; border-radius:10px; background:#fff; }
+#photoPreview .photo-preview-chip img { display:block; width:64px; height:64px; object-fit:cover; border-radius:7px; background:#f0f3f7; }
+#photoPreview .photo-preview-name { min-width:0; overflow-wrap:anywhere; font-size:11px; line-height:1.35; color:#344054; }
+#photoPreview .photo-remove { width:28px; height:28px; border:1px solid #f0caca; border-radius:7px; background:#fff5f5; color:#b42318; font-size:20px; line-height:1; cursor:pointer; touch-action:manipulation; }
+#photoPreview .photo-remove:hover { background:#fee2e2; }
+.photo-drop.dragover { outline:3px solid rgba(230,51,51,.12); border-color:#e63333; background:#fff4f4; }
+@media(max-width:520px) {
+  #photoPreview { grid-template-columns:1fr; }
+  #photoPreview .photo-preview-chip { grid-template-columns:68px minmax(0,1fr) 36px; min-height:82px; }
+  #photoPreview .photo-preview-chip img { width:68px; height:68px; }
+  #photoPreview .photo-remove { width:34px; height:34px; }
+}
